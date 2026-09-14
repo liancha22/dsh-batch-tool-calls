@@ -168,37 +168,59 @@ python3 "$DSH_HOME/plugin-manager.py" import <本地压缩包>
 python3 "$DSH_HOME/plugin-manager.py" download <压缩包直链>
 ```
 
-## 可选：打 tag 自动发布（GitHub Actions）
+## 打 tag 自动发布（工作流已就位，只差两步一次性设置）
 
-npm 现在推荐 **Trusted Publishing（OIDC）**：在 npm 网站上把「包 ↔ GitHub 仓库 ↔ workflow 文件」绑好，
-Actions 里用 `id-token: write` 就能发布，**一个长期密钥都不用存**。
-先在 <https://www.npmjs.com/> 的包设置里配置 Trusted Publisher（owner / repo / workflow 文件名，例如 `publish.yml`），
-再放这个 workflow：
+`.github/workflows/publish.yml` 已经提交进仓库，它的行为：
 
-```yaml
-name: publish
-on:
-  push:
-    tags: ['v*']
-jobs:
-  npm:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write          # Trusted Publishing 必需
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-      - run: npm install
-      - run: npm test
-      - run: npm publish --provenance --access public
+| 触发 | 做什么 |
+| --- | --- |
+| push `v*` 标签 | 升级 npm → `npm ci` → `npm test` → **校验标签与 `package.json` 版本一致** → 用 **OIDC（Trusted Publishing）** 发到 npm → 再建一个 GitHub Release 并附上 `npm pack` 的 `.tgz` |
+| Actions 页面手动 Run | 只跑 npm 发布，不建 Release |
+
+两个顺带的好处：发布包带 **provenance 来源证明**（OIDC 自动生成）；Release 里那个 `.tgz`
+让「路线 C」也成立 —— 别人可以 `plugin-manager.py release liancha22 dsh-batch-tool-calls latest`。
+
+**为什么第一次不能直接靠标签**：Trusted Publisher 是在 npm 的「包设置」页里绑定的，
+包还不存在就没有那个页面。所以首版必须先手动发一次：
+
+**第一步 · 手动发首版**（本机，约 2 分钟）
+
+```bash
+cd /root/.dsh/plugin-src/dsh-batch-tool-calls
+npm login --auth-type=web     # 浏览器点一下授权；本机凭据约 2 小时有效
+npm publish                   # 无 scope 的包默认 public
 ```
 
-如果暂时只有 Granular token（不推荐长期使用，2027-01 起会失去直接发布能力），把最后一步换成
-`env: { NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} }`，并把这个 token 存进仓库 Secrets。
+**第二步 · 绑定 Trusted Publisher**（一次性，浏览器）
+
+打开 <https://www.npmjs.com/package/dsh-batch-tool-calls/access> → Trusted Publisher →
+选 **GitHub Actions**，四个字段：
+
+| 字段 | 值 |
+| --- | --- |
+| Organization or user | `liancha22` |
+| Repository | `dsh-batch-tool-calls` |
+| Workflow filename | `publish.yml` |
+| Environment | 留空 |
+
+**以后每次发版：一条命令**
+
+```bash
+node scripts/release.mjs patch      # 也可以 minor / major / 1.2.3
+node scripts/release.mjs patch --dry-run   # 只检查、只打印，不动仓库
+```
+
+它会先把关（工作区干净、在 main 上、标签不重复），然后 `npm version` 改版本号 + 提交 +
+打 `vX.Y.Z` 标签，最后 `git push --follow-tags`；推送完成后 Actions 自动发布。
+
+**出问题先看这里**
+
+- OIDC / `id-token` 报错：确认 workflow 里 `permissions: id-token: write` 还在，
+  且 npm 侧 Owner / Repo / Workflow 文件名与仓库**完全一致**（大小写敏感）。
+- 403 已存在：`package.json` 版本号没动，或标签和版本不一致（工作流会先拦下来）。
+- 想临时用 token 兜底（不推荐）：把发布步骤换成 `env: { NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} }`，
+  把 token 存进仓库 Secrets。注意 Granular token 必须勾 **Bypass 2FA** 才能在 CI 里发布，
+  而 npm 计划 2027-01 起取消这条路径 —— 所以长期还是用 OIDC。
 
 ## 发布之后
 

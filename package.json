@@ -19,7 +19,8 @@
   ],
   "scripts": {
     "test": "node test/verify.mjs && node test/integration.mjs",
-    "report": "node scripts/step-report.mjs"
+    "report": "node scripts/step-report.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.2"

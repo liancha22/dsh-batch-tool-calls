@@ -1,13 +1,19 @@
 name: publish
 
-# 打 v* 标签时自动发布到 npm。
-# 需要先在 npm 包设置里配置 Trusted Publisher（owner / repo / 本文件名 publish.yml），
-# 这样 Actions 用 OIDC 发布，仓库里不用存任何 npm token。
-# 详见 PUBLISH.md「可选：打 tag 自动发布」。
+# 打 v* 标签时：
+#   1) 发布到 npm —— 走 Trusted Publishing（OIDC），仓库里不存任何 npm token
+#   2) 建一个 GitHub Release，并附上 npm pack 出来的 .tgz
+#      （这样别人也能用 DSH 的「从 Release 安装」：plugin-manager.py release <owner> <repo> latest）
+# 首次发布会失败，因为 npm 上还没有这个包、也就绑不了 Trusted Publisher ——
+# 先在本机手动 npm publish 一次，再去 npm 包设置里绑定，详见 PUBLISH.md「打 tag 自动发布」。
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   npm:
@@ -23,6 +29,38 @@ jobs:
           registry-url: https://registry.npmjs.org
       # Trusted Publishing（OIDC）需要较新的 npm；Node 22 自带的是 npm 10.x，先升级
       - run: npm install -g npm@latest
-      - run: npm install
+      - run: npm ci
       - run: npm test
-      - run: npm publish --provenance --access public
+      - name: 校验标签与 package.json 版本一致
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const tag = process.env.TAG.replace(/^v/, "");
+            if (tag !== pkg.version) {
+              console.error("标签 " + process.env.TAG + " 和 package.json 的 " + pkg.version + " 不一致，已停止发布");
+              process.exit(1);
+            }
+            console.log("版本一致：" + pkg.version);
+          '
+      - name: 发布到 npm
+        run: npm publish
+
+  release:
+    needs: npm
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm pack
+      - name: 建 Release 并附上 .tgz
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" ./*.tgz --generate-notes --verify-tag
