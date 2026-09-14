@@ -47,6 +47,10 @@ jobs:
             console.log("版本一致：" + pkg.version);
           '
       - name: 发布到 npm
+        env:
+          # OIDC（Trusted Publishing）优先；还没绑定 Trusted Publisher 时自动回退到这个 token。
+          # 绑好之后可以删掉这个 secret 和这两行（见 PUBLISH.md）。
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish
 
   release:
