@@ -1,0 +1,28 @@
+name: publish
+
+# 打 v* 标签时自动发布到 npm。
+# 需要先在 npm 包设置里配置 Trusted Publisher（owner / repo / 本文件名 publish.yml），
+# 这样 Actions 用 OIDC 发布，仓库里不用存任何 npm token。
+# 详见 PUBLISH.md「可选：打 tag 自动发布」。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write          # Trusted Publishing（OIDC）必需
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted Publishing（OIDC）需要较新的 npm；Node 22 自带的是 npm 10.x，先升级
+      - run: npm install -g npm@latest
+      - run: npm install
+      - run: npm test
+      - run: npm publish --provenance --access public

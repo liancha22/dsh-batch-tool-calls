@@ -1,0 +1,48 @@
+{
+  "name": "dsh-batch-tool-calls",
+  "version": "1.0.0",
+  "description": "DSH 插件：让 Agent 在一个步骤里批量发起互不依赖的工具调用，减少步数与提示缓存重读量。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "scripts",
+    "test",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/verify.mjs && node test/integration.mjs",
+    "report": "node scripts/step-report.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.2"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent",
+    "tool-calling",
+    "prompt-cache",
+    "token-cost"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "repository": "https://github.com/liancha22/dsh-batch-tool-calls",
+  "author": "liancha22 <1784351702@qq.com>",
+  "homepage": "https://github.com/liancha22/dsh-batch-tool-calls#readme",
+  "bugs": {
+    "url": "https://github.com/liancha22/dsh-batch-tool-calls/issues"
+  }
+}
