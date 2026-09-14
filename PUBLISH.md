@@ -183,12 +183,21 @@ python3 "$DSH_HOME/plugin-manager.py" download <压缩包直链>
 **为什么第一次不能直接靠标签**：Trusted Publisher 是在 npm 的「包设置」页里绑定的，
 包还不存在就没有那个页面。所以首版必须先手动发一次：
 
+**第零步 · 先给 npm 账号开 2FA（npm 现在强制，绕不过）**
+
+npm 的现行规定是：**所有包的创建与发布、以及修改包设置，都必须有 2FA**
+（[官方说明](https://docs.npmjs.com/requiring-2fa-for-package-publishing-and-settings-modification/)）。
+没有 2FA 的账号发布必然 403（`Two-factor authentication or granular access token with bypass 2fa
+enabled is required to publish packages`）。做法：npm 头像 → Settings → Two-Factor Authentication →
+Enable 2FA → 选 **Authenticator app** → 扫二维码 → 输入 6 位码确认 → **把恢复码抄下来存好**
+（手机丢了只能靠它找回账号）。
+
 **第一步 · 手动发首版**（本机，约 2 分钟）
 
 ```bash
 cd /root/.dsh/plugin-src/dsh-batch-tool-calls
 npm login --auth-type=web     # 浏览器点一下授权；本机凭据约 2 小时有效
-npm publish                   # 无 scope 的包默认 public
+npm publish --otp=123456      # 6 位码来自验证器 App，30 秒内有效
 ```
 
 **第二步 · 绑定 Trusted Publisher**（一次性，浏览器）
@@ -202,6 +211,7 @@ npm publish                   # 无 scope 的包默认 public
 | Repository | `dsh-batch-tool-calls` |
 | Workflow filename | `publish.yml` |
 | Environment | 留空 |
+| Allowed actions | **勾选 `npm publish`** —— 2026-09-03 之后新建的连接默认只放行 `npm stage publish`（需人工审核），不勾 `npm publish` 工作流会被拒 |
 
 **以后每次发版：一条命令**
 
