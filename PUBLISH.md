@@ -105,18 +105,21 @@ npm deprecate dsh-batch-tool-calls@1.0.0 "有问题的原因"   # 发错了用�
 5 层寻找带 `dsh.bundle` 的 `package.json`，一个仓库最多 30 个插件；多插件仓库要装某一个时，
 把子目录写进第 3 个参数。
 
-**当前状态**：`git init`、git 身份（`liancha22 <1784351702@qq.com>`）、`package.json` 的
-`repository` / `author` / `homepage` / `bugs`、首个 commit 都已完成 —— 只差建远端仓库并 push：
+**当前状态：已发布并推送完成。** 仓库 <https://github.com/liancha22/dsh-batch-tool-calls>
+（public，默认分支 `main`），本机用 SSH key 推上去，远端 HEAD = 本地 commit。以后每改一版：
 
 ```bash
 cd /root/.dsh/plugin-src/dsh-batch-tool-calls
-git remote add origin https://github.com/liancha22/dsh-batch-tool-calls.git
-git push -u origin main
+git add -A && git commit -m "feat: ..." && git push
 ```
 
-远端仓库先在 <https://github.com/new> 建（Public，**不要**勾 README / .gitignore / license，
-否则远端已有提交，push 前得先 `git pull --rebase`）；push 时的"密码"位置要用 SSH key 或
-fine-grained PAT，不能用登录密码（见 B-1）。
+推送凭据是本机 `/root/.ssh/id_ed25519`（对应 GitHub 上名为 `dsh-android` 的那把 SSH key），
+remote 已设成 `git@github.com:liancha22/dsh-batch-tool-calls.git`；HTTPS + fine-grained PAT 的
+做法见 B-1（现在用不到）。别人安装：
+
+```bash
+python3 "$DSH_HOME/plugin-manager.py" github liancha22 dsh-batch-tool-calls
+```
 
 **别人怎么装**（应用内：插件页 → 从 GitHub 安装 → 填 `owner/repo`，可带 `/分支或标签/子目录`）：
 

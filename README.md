@@ -3,6 +3,8 @@
 > DSH（DeepSeek Harness）插件：让 Agent 在**一个步骤**里批量发起互不依赖的工具调用 —— 步数更少，
 > 提示缓存重读量更小，同样的任务更省钱。
 
+仓库：<https://github.com/liancha22/dsh-batch-tool-calls>
+
 一个步骤 = 一次模型调用。每一步都会把整个对话上下文重新发一遍（**命中提示缓存同样计费**），
 所以「一步多做几件事」直接决定的不是速度，而是账单。
 
@@ -45,7 +47,18 @@
 
 ## 安装
 
-**A. 从 npm（发布后）**
+**A. 从 GitHub（已发布，推荐）**
+
+```bash
+# 应用内：插件页 → 从 GitHub 安装 → 填 liancha22/dsh-batch-tool-calls
+python3 "$DSH_HOME/plugin-manager.py" github liancha22 dsh-batch-tool-calls
+# 装完重启该 profile 生效
+```
+
+仓库根就是插件根（`package.json` 里声明 `dsh.bundle.patch`），安装器会把该 ref 解析成
+commit SHA 后下载，装到的是**固定版本**；换版本时重跑一次上面的命令即可。
+
+**B. 从 npm（发布后）**
 
 ```bash
 dsh plugin --profile <profile> add dsh-batch-tool-calls
@@ -63,7 +76,7 @@ dsh plugin --profile <profile> add dsh-batch-tool-calls
         language: auto
 ```
 
-**B. 本地目录（开发 / 未发布）**
+**C. 本地目录（开发 / 未发布）**
 
 ```bash
 git clone <this-repo> ~/.dsh/plugin-src/dsh-batch-tool-calls
@@ -75,7 +88,7 @@ ln -s ~/.dsh/plugin-src/dsh-batch-tool-calls <profile>/node_modules/dsh-batch-to
 
 `@deepseek-ai/schemastery` 由 DSH 运行时提供（profile 的共享 node_modules 里就有），无需自己安装依赖。
 
-**C. 手工合并**：把 `cordis.patch.yml` 里的 `insert` 段落合并进 profile 的 `cordis.patch.yml`（用户补丁层在 bundle 层之后生效）。
+**D. 手工合并**：把 `cordis.patch.yml` 里的 `insert` 段落合并进 profile 的 `cordis.patch.yml`（用户补丁层在 bundle 层之后生效）。
 
 ## 配置
 
