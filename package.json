@@ -40,7 +40,10 @@
       "patch": "./cordis.patch.yml"
     }
   },
-  "repository": "https://github.com/liancha22/dsh-batch-tool-calls",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liancha22/dsh-batch-tool-calls.git"
+  },
   "author": "liancha22 <1784351702@qq.com>",
   "homepage": "https://github.com/liancha22/dsh-batch-tool-calls#readme",
   "bugs": {
