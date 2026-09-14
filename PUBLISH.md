@@ -177,6 +177,13 @@ python3 "$DSH_HOME/plugin-manager.py" download <压缩包直链>
 | push `v*` 标签 | 升级 npm → `npm ci` → `npm test` → **校验标签与 `package.json` 版本一致** → 用 **OIDC（Trusted Publishing）** 发到 npm → 再建一个 GitHub Release 并附上 `npm pack` 的 `.tgz` |
 | Actions 页面手动 Run | 只跑 npm 发布，不建 Release |
 
+> **当前状态（2026-09-14）：`v1.0.0` 已通过这条工作流发布成功** —— 两个 job 全绿，
+> npm 上是 `dsh-batch-tool-calls@1.0.0`，Release `v1.0.0` 上挂着 `dsh-batch-tool-calls-1.0.0.tgz`。
+> 首次发布是用仓库 Secrets 里的 **`NPM_TOKEN`**（勾了 Bypass 2FA 的 granular token）引导的，
+> 因为 npm 规定「包设置页」里的 Trusted Publisher 只能在包存在之后绑定。
+> 现在包已经存在 —— 按下面「第二步」绑好 Trusted Publisher 后，就可以**删掉 `NPM_TOKEN`**：
+> 工作流已经把 OIDC 排在 token 前面，npm CLI 会优先用 OIDC，token 只是一个兜底。
+
 两个顺带的好处：发布包带 **provenance 来源证明**（OIDC 自动生成）；Release 里那个 `.tgz`
 让「路线 C」也成立 —— 别人可以 `plugin-manager.py release liancha22 dsh-batch-tool-calls latest`。
 
@@ -192,13 +199,17 @@ enabled is required to publish packages`）。做法：npm 头像 → Settings �
 Enable 2FA → 选 **Authenticator app** → 扫二维码 → 输入 6 位码确认 → **把恢复码抄下来存好**
 （手机丢了只能靠它找回账号）。
 
-**第一步 · 手动发首版**（本机，约 2 分钟）
+**第一步 · 手动发首版**（✅ 已完成；新包才需要，这里留作记录）
 
 ```bash
 cd /root/.dsh/plugin-src/dsh-batch-tool-calls
 npm login --auth-type=web     # 浏览器点一下授权；本机凭据约 2 小时有效
 npm publish --otp=123456      # 6 位码来自验证器 App，30 秒内有效
 ```
+
+> 如果账号只绑了**安全密钥**（没有验证器 App）就取不到 6 位码：要么在 npm 里再补绑一个
+> Authenticator app，要么跳过这步，直接用「勾了 Bypass 2FA 的 granular token」当 `NPM_TOKEN`
+> 放进仓库 Secrets，让工作流完成首版发布（本次就是这么做的）。
 
 **第二步 · 绑定 Trusted Publisher**（一次性，浏览器）
 
