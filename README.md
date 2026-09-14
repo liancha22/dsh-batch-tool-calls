@@ -58,6 +58,9 @@ python3 "$DSH_HOME/plugin-manager.py" github liancha22 dsh-batch-tool-calls
 仓库根就是插件根（`package.json` 里声明 `dsh.bundle.patch`），安装器会把该 ref 解析成
 commit SHA 后下载，装到的是**固定版本**；换版本时重跑一次上面的命令即可。
 
+> ⚠️ 在本机那份带 `.git` 的开发目录上跑这条命令，会把它整体替换成下载版（`.git` 随之消失）。
+> 本机自测请用下面的 C，或先把开发目录另存一份。
+
 **B. 从 npm（发布后）**
 
 ```bash
