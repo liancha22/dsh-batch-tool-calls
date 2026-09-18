@@ -1,6 +1,6 @@
 {
   "name": "dsh-batch-tool-calls",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "DSH 插件：让 Agent 在一个步骤里批量发起互不依赖的工具调用，减少步数与提示缓存重读量。",
   "type": "module",
   "main": "lib/index.js",
