@@ -177,12 +177,21 @@ python3 "$DSH_HOME/plugin-manager.py" download <压缩包直链>
 | push `v*` 标签 | 升级 npm → `npm ci` → `npm test` → **校验标签与 `package.json` 版本一致** → 用 **OIDC（Trusted Publishing）** 发到 npm → 再建一个 GitHub Release 并附上 `npm pack` 的 `.tgz` |
 | Actions 页面手动 Run | 只跑 npm 发布，不建 Release |
 
-> **当前状态（2026-09-14）：`v1.0.0` 已通过这条工作流发布成功** —— 两个 job 全绿，
-> npm 上是 `dsh-batch-tool-calls@1.0.0`，Release `v1.0.0` 上挂着 `dsh-batch-tool-calls-1.0.0.tgz`。
-> 首次发布是用仓库 Secrets 里的 **`NPM_TOKEN`**（勾了 Bypass 2FA 的 granular token）引导的，
-> 因为 npm 规定「包设置页」里的 Trusted Publisher 只能在包存在之后绑定。
+> **当前状态（2026-09-18）：`v1.1.1` 已通过这条工作流发布成功** —— 两个 job 全绿，
+> npm 上 `latest = 1.1.1`（`1.0.0 → 1.1.0 → 1.1.1`），Release `v1.1.1` 上挂着
+> `dsh-batch-tool-calls-1.1.1.tgz`。之后的版本只管 `node scripts/release.mjs patch|minor|major`
+> 一条命令：改版本号 → 提交 → 打标签 → 推送，剩下交给工作流。
+> 首次发布（`v1.0.0`，2026-09-14）是用仓库 Secrets 里的 **`NPM_TOKEN`**（勾了 Bypass 2FA 的
+> granular token）引导的，因为 npm 规定「包设置页」里的 Trusted Publisher 只能在包存在之后绑定。
 > 现在包已经存在 —— 按下面「第二步」绑好 Trusted Publisher 后，就可以**删掉 `NPM_TOKEN`**：
 > 工作流已经把 OIDC 排在 token 前面，npm CLI 会优先用 OIDC，token 只是一个兜底。
+>
+> **踩过的坑（留给下一次）**：`v1.1.0` 的第一次 Run 挂在 `npm test` —— 新加的断言写死了中文
+> 「每步自检」，而 `language: auto` 在 GitHub runner 上没有 `DSHA_UI_LANGUAGE`，解析成了英文。
+> 教训：**测试不要依赖机器的语言/区域环境变量**（现在测试里有一条「没有任何语言环境变量时
+> auto 落到 en」的显式断言来钉住这件事）。另外 Actions 的原始日志匿名读不到（403），
+> 所以工作流在测试失败时会把 FAIL 行和输出尾部写成 **annotation**，用
+> `GET /repos/{owner}/{repo}/commits/{sha}/check-runs` + `/annotations` 就能读到失败原因。
 
 两个顺带的好处：发布包带 **provenance 来源证明**（OIDC 自动生成）；Release 里那个 `.tgz`
 让「路线 C」也成立 —— 别人可以 `plugin-manager.py release liancha22 dsh-batch-tool-calls latest`。
