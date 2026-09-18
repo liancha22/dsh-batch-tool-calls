@@ -31,7 +31,17 @@ jobs:
       # Trusted Publishing 要求 npm CLI >= 11.5.1（Node 24 自带的可能更旧）
       - run: npm install -g npm@latest
       - run: npm ci
-      - run: npm test
+      # 测试失败时把输出尾部写成 annotation：Actions 的原始日志匿名读不到，
+      # 而 check-run annotation 可以用 API 读到（仓库自查发布失败原因就走这条路）。
+      - name: 跑测试
+        run: |
+          set -o pipefail
+          if npm test 2>&1 | tee /tmp/npm-test.log; then
+            exit 0
+          fi
+          echo "::error title=npm test 失败（FAIL 行）::$(grep -F 'FAIL' /tmp/npm-test.log | awk '{printf "%s%%0A", $0}')"
+          echo "::error title=npm test 失败（输出尾部）::$(tail -n 30 /tmp/npm-test.log | awk '{printf "%s%%0A", $0}')"
+          exit 1
       - name: 校验标签与 package.json 版本一致
         if: startsWith(github.ref, 'refs/tags/')
         env:

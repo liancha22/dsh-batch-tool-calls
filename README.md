@@ -140,7 +140,7 @@ ln -s ~/.dsh/plugin-src/dsh-batch-tool-calls <profile>/node_modules/dsh-batch-to
 
 ```bash
 npm install                               # 唯一依赖：@deepseek-ai/schemastery（插件配置 schema）
-npm test                                  # verify(55 项) + integration(真实 systemPrompt 服务，9 项)
+npm test                                  # verify(57 项) + integration(真实 systemPrompt 服务，9 项)
 node test/verify.mjs                      # 模块形状 / 配置解析 / 注册行为 / 文本生成 / 压缩后提醒的接线
 node test/integration.mjs                 # 在真实 systemPrompt 上注册 → 组装 → 断言段落出现且顺序正确
 node scripts/step-report.mjs <会话日志>    # 装前装后对比：步数、每步调用数分布、单调用步数
@@ -202,7 +202,7 @@ disposer 由 Cordis 生命周期接管）。
 - 提示段默认位置从 `order: 100` 移到 `order: 9500`（工具说明之后、靠近对话），提高每步可见度。
 - 文本加入「每步自检」和「与是否压缩无关」的明确措辞。
 - 新增 `reassertEverySteps`（默认 0）。
-- 测试：verify 25 → 55 项，integration 6 → 9 项。
+- 测试：verify 25 → 57 项，integration 6 → 9 项（其中新增的 auto 语言断言在无语言环境变量的机器上也能通过）。
 
 ### 1.0.0
 

@@ -81,7 +81,8 @@ ok('段名固定为 ' + SECTION_NAME, section.name === SECTION_NAME)
 ok('注册到 order=9500', section.order === 9500)
 ok('文本是静态字符串（对提示缓存友好）', typeof section.text === 'string')
 ok('文本含「同步发多个调用」的核心规则', /同一个步骤/.test(section.text) || /SAME step/.test(section.text))
-ok('文本含每步自检', section.text.includes('每步自检'))
+// language=auto：本机可能解析成 zh 或 en，断言必须两种都认（CI 上没有语言环境变量，会走 en）
+ok('文本含每步自检', /每步自检/.test(section.text) || /Per-step check/.test(section.text), section.text.slice(0, 40))
 ok('文本要求 checkpoint 保留本节规则', section.text.includes('Critical Context'))
 ok('文本不含 {{}} 提示变量', section.text.includes('{{') === false)
 
@@ -176,6 +177,16 @@ process.env.DSHA_UI_LANGUAGE = 'en-US'
 ok('auto 跟随 DSHA_UI_LANGUAGE=en-US', pickLanguage('auto') === 'en')
 if (keep === undefined) delete process.env.DSHA_UI_LANGUAGE
 else process.env.DSHA_UI_LANGUAGE = keep
+// 没有任何语言环境变量时（CI 就是这样）auto 必须落到 en，否则同一份测试在不同机器上结果不同
+const LANGUAGE_KEYS = ['DSH_UI_LANGUAGE', 'DSHA_UI_LANGUAGE', 'LC_ALL', 'LANG']
+const keptLanguage = Object.fromEntries(LANGUAGE_KEYS.map((key) => [key, process.env[key]]))
+for (const key of LANGUAGE_KEYS) delete process.env[key]
+ok('auto 在没有任何语言环境变量时落到 en', pickLanguage('auto') === 'en')
+ok('同一环境下 auto 文本是英文', buildSectionText({ language: 'auto' }).includes('Spend fewer steps'))
+for (const key of LANGUAGE_KEYS) {
+  if (keptLanguage[key] === undefined) delete process.env[key]
+  else process.env[key] = keptLanguage[key]
+}
 
 // ---- 文本细节 ---------------------------------------------------------------
 ok('mentionShell:false 去掉 shell 合并那条', buildSectionText({ language: 'zh', mentionShell: false }).includes('a && b') === false)
