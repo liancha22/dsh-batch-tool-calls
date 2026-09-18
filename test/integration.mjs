@@ -86,5 +86,54 @@ if (off.service !== undefined) {
   ok('enabled:false 时系统提示里没有该段落', prompt.includes('省步数') === false)
 }
 
+// ---- 真实事件总线：compaction/end → agent/pre-step（不是假 ctx，是 Cordis 自己的 dispatch）----
+// 这一段是 v1.1.0 的核心机制：宿主发的是 waterfall 事件，我们先在真总线上确认
+// 「emit 会话事件 → waterfall 里被插入一条消息」整条链路成立，再确认卸载后干净。
+if (booted.service !== undefined) {
+  const live = await boot({ includeHarnessIdentity: true, includeRuntimeContext: false })
+  const session = { id: 'session-integration-test' }
+  // 用模块自己的 apply（配置走 normalize 的宽松路径），由 Cordis 负责注入 systemPrompt；
+  // await 这个 fiber 表示加载已完成（比 sleep 更确定）。
+  const scope = await live.ctx.plugin({ name: 'batch-tool-calls-test', inject: ['systemPrompt'], apply }, { language: 'zh' })
+
+  const stepPayload = (messages = []) => ({
+    agent: { session },
+    messages,
+    turn: 1,
+    step: 2,
+    signal: new AbortController().signal,
+  })
+  const inner = async () => ({ kind: 'enter', messages: [] })
+  const dispatch = (payload) => live.ctx.waterfall('agent/pre-step', payload, inner)
+
+  let decision = await dispatch(stepPayload())
+  ok('真总线上：没压缩时不插消息', decision.kind === 'enter' && decision.messages.length === 0, decision.messages.length)
+
+  live.ctx.emit('session/event', session, { type: 'compaction/end', data: { compactionId: 'c-int', turn: 1 } })
+  decision = await dispatch(stepPayload())
+  ok('真总线上：compaction/end 之后被插入一条 notice', decision.messages.length === 1, decision.messages.length)
+  ok(
+    '真总线上：插入的正是本插件的 notice',
+    decision.messages[0]?.source?.plugin === 'batch-tool-calls' && decision.messages[0]?.source?.form === 'notice',
+    decision.messages[0]?.source,
+  )
+
+  decision = await dispatch(stepPayload())
+  ok('真总线上：同一次压缩只插一次', decision.messages.length === 0, decision.messages.length)
+
+  live.ctx.emit('session/event', session, { type: 'compaction/end', data: { compactionId: 'c-int2', error: 'boom' } })
+  decision = await dispatch(stepPayload())
+  ok('真总线上：压缩失败不插消息', decision.messages.length === 0, decision.messages.length)
+
+  // 顺带确认水流契约没被破坏：监听器调用 next()，下游决定原样返回
+  const downstream = await dispatch({ ...stepPayload(), step: 99 })
+  ok('真总线上：下游 decision 结构没被改坏', downstream.kind === 'enter' && Array.isArray(downstream.messages))
+
+  await scope.dispose()
+  live.ctx.emit('session/event', session, { type: 'compaction/end', data: { compactionId: 'c-int3', turn: 1 } })
+  decision = await dispatch(stepPayload())
+  ok('卸载后监听器一并撤销', decision.messages.length === 0, decision.messages.length)
+}
+
 console.log('\n==== ' + pass + ' passed, ' + fail + ' failed ====')
 process.exit(fail === 0 ? 0 : 1)

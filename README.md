@@ -140,15 +140,20 @@ ln -s ~/.dsh/plugin-src/dsh-batch-tool-calls <profile>/node_modules/dsh-batch-to
 
 ```bash
 npm install                               # 唯一依赖：@deepseek-ai/schemastery（插件配置 schema）
-npm test                                  # verify(57 项) + integration(真实 systemPrompt 服务，9 项)
+npm test                                  # verify(57 项) + integration(真实 systemPrompt 服务 + 真实事件总线，16 项)
 node test/verify.mjs                      # 模块形状 / 配置解析 / 注册行为 / 文本生成 / 压缩后提醒的接线
 node test/integration.mjs                 # 在真实 systemPrompt 上注册 → 组装 → 断言段落出现且顺序正确
 node scripts/step-report.mjs <会话日志>    # 装前装后对比：步数、每步调用数分布、单调用步数
 ```
 
-`verify.mjs` 里的压缩后提醒用**假的事件总线**跑真实逻辑：构造 `compaction/end` →
-调 `agent/pre-step` → 断言插了一条 `notice`、同一次压缩只插一次、压缩失败（带 `error`）不插、
-本步被取消时不插且留到下一步、`reassertEverySteps` 按步数触发。
+`verify.mjs` 用**假的事件总线**跑插件逻辑：构造 `compaction/end` → 调 `agent/pre-step` →
+断言插了一条 `notice`、同一次压缩只插一次、压缩失败（带 `error`）不插、本步被取消时不插且留到
+下一步、`reassertEverySteps` 按步数触发。
+
+`integration.mjs` 更进一步，用**真的 Cordis 上下文**（拉起真实的 `dsh-system-prompt` 服务）：
+`ctx.emit('session/event', …, {type:'compaction/end'})` → `ctx.waterfall('agent/pre-step', …)`
+走宿主自己的 dispatch，断言消息被插进来、第二次不再插、`error` 事件不插、下游 decision 结构没被
+改坏、`await scope.dispose()` 之后监听器一并撤销。
 
 `integration.mjs` 在没有 DSH 运行时包的机器上会打印 `SKIP` 并以 0 退出（`npm test` 因此可移植）。
 `step-report.mjs` 需要带 zstd 的 Node（22.15+ / 23+），只用 `node:zlib`，无第三方依赖。
@@ -195,6 +200,13 @@ disposer 由 Cordis 生命周期接管）。
 
 ## 更新记录
 
+### 1.1.1
+
+- 测试增强：新增「真实 Cordis 事件总线」上的全链路断言（emit `compaction/end` → waterfall
+  `agent/pre-step` → 断言 `notice` 插入、只插一次、失败不插、卸载后撤销）。
+- 没开 `reassertEverySteps` 时不再维护每会话步数（少一点每步开销与状态）。
+- 运行时行为与 1.1.0 相同。
+
 ### 1.1.0
 
 - 修复「压缩几次上下文后就不守规矩」：压缩后在下一次 `agent/pre-step` 补一条短 `notice` 提醒
@@ -202,7 +214,8 @@ disposer 由 Cordis 生命周期接管）。
 - 提示段默认位置从 `order: 100` 移到 `order: 9500`（工具说明之后、靠近对话），提高每步可见度。
 - 文本加入「每步自检」和「与是否压缩无关」的明确措辞。
 - 新增 `reassertEverySteps`（默认 0）。
-- 测试：verify 25 → 57 项，integration 6 → 9 项（其中新增的 auto 语言断言在无语言环境变量的机器上也能通过）。
+- 测试：verify 25 → 57 项，integration 6 → 16 项（新增真 Cordis 事件总线上的压缩→插消息全链路；
+  auto 语言断言在无语言环境变量的机器上也能通过）。
 
 ### 1.0.0
 
