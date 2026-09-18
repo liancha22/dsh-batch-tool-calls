@@ -56,20 +56,32 @@ const booted = await boot({ includeHarnessIdentity: true, includeRuntimeContext:
 ok('真实 systemPrompt 服务可用', typeof booted.service?.section === 'function')
 
 if (booted.service !== undefined) {
-  apply({ systemPrompt: booted.service }, Config({ language: 'zh', minCalls: 3, maxCalls: 6 }))
+  // 摆一个 order=1000（工具说明的位置）的段落，验证本插件现在落在它之后。
+  booted.service.section({ name: 'test:tool-policy', order: 1000, text: 'TOOL_SECTION_MARKER' })
+  const events = []
+  apply(
+    { systemPrompt: booted.service, on: (event) => { events.push(event); return () => {} } },
+    Config({ language: 'zh', minCalls: 3, maxCalls: 6 }),
+  )
   const prompt = renderPrompt(await booted.service.assemble({}))
   ok('组装出的系统提示里出现本插件的段落', prompt.includes('省步数：一步之内多发几个工具调用'), prompt.slice(0, 100))
   ok('段落排在人格前缀之后', prompt.indexOf('省步数') > prompt.indexOf('PERSONA_PREFIX_MARKER'), {
     personaAt: prompt.indexOf('PERSONA_PREFIX_MARKER'),
     sectionAt: prompt.indexOf('省步数'),
   })
+  ok('段落排在工具说明之后（默认 order 9500）', prompt.indexOf('省步数') > prompt.indexOf('TOOL_SECTION_MARKER'), {
+    toolAt: prompt.indexOf('TOOL_SECTION_MARKER'),
+    sectionAt: prompt.indexOf('省步数'),
+  })
   ok('段落带上配置的调用数区间', prompt.includes('3–6'))
   ok('段落带上 shell 合并规则', prompt.includes('a && b'))
+  ok('段落含每步自检与 checkpoint 保留要求', prompt.includes('每步自检') && prompt.includes('Critical Context'))
+  ok('在真实 ctx 上注册了压缩后提醒的两个监听', events.includes('session/event') && events.includes('agent/pre-step'), events)
 }
 
 const off = await boot({ includeHarnessIdentity: true, includeRuntimeContext: false })
 if (off.service !== undefined) {
-  apply({ systemPrompt: off.service }, Config({ enabled: false }))
+  apply({ systemPrompt: off.service, on: () => () => {} }, Config({ enabled: false }))
   const prompt = renderPrompt(await off.service.assemble({}))
   ok('enabled:false 时系统提示里没有该段落', prompt.includes('省步数') === false)
 }

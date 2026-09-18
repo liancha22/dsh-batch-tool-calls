@@ -16,8 +16,8 @@
         enabled: true
         # auto = 跟随部署语言（读 DSH_UI_LANGUAGE / DSHA_UI_LANGUAGE / LANG），也可写死 zh / en
         language: auto
-        # 段落排序：人格前缀(0) 之后、plan:policy(500) 之前
-        order: 100
+        # 段落排序：工具说明(1000–2900) 之后、persona-suffix(10200) 之前，越靠近对话越不容易被忽略
+        order: 9500
         # 提示里建议的每步调用数区间
         minCalls: 3
         maxCalls: 6
@@ -25,3 +25,8 @@
         mentionShell: true
         # 追加自定义文本（会在内置文本之后另起一段）
         extra: ''
+        # 上下文被压缩（compaction）后，在下一次 pre-step 补一条很短的提醒；
+        # 这是本插件唯一会往对话里写消息的动作，不想要就设为 false
+        reassertAfterCompaction: true
+        # 另外每 N 步补一条同样的短提醒（0 = 关闭；压缩后仍漂移时可以试 10–20）
+        reassertEverySteps: 0

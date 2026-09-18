@@ -25,16 +25,46 @@
 
 ## 这个插件做什么
 
-往宿主的 **systemPrompt** 注册一段**静态**提示段（默认 `order: 100`，位于人格前缀之后、
-`plan:policy` 之前），告诉 Agent：
+**通道 1：往宿主 systemPrompt 注册一段静态提示段**（默认 `order: 9500`，位于工具说明之后、
+`deployment:persona-suffix` 之前 —— 越靠近对话越不容易被忽略），告诉 Agent：
 
 - 互不依赖的侦查调用一次发齐（默认建议 3–6 个），不要一个一个来；
 - 多条独立 shell 命令合并成一次 `bash`（`a && b`；都要跑用 `a; b`）；
 - 只有后一个调用需要前一个的结果时才拆到下一步；
 - 同一文件的多次 `edit`、「先 read 再 edit」必须串行；
-- 依赖链 / 破坏性操作 / 需要用户确认的动作照旧一步一步来，不为省步数牺牲正确性。
+- 依赖链 / 破坏性操作 / 需要用户确认的动作照旧一步一步来，不为省步数牺牲正确性；
+- **每步自检**：一步只发一个调用之前，先问「还有哪个互不依赖的调用可以并进来」。
 
-**不改变工具清单、不改变并发上限、不碰缓存策略** —— 只是在系统提示里把「一步多发」写成明确规则。
+**通道 2：上下文压缩之后再提醒一次**（v1.1.0 新增，见下一节）。
+
+**不改变工具清单、不改变并发上限、不碰缓存策略** —— 只是在提示里把「一步多发」写成明确规则。
+
+## 压缩几次以后就不听劝了？（v1.1.0 的主要修复）
+
+真实的抱怨是：「前面挺守规矩，**压缩过几次上下文之后就难遵守了**。」
+
+原因是机制性的，不是模型健忘：
+
+1. 上下文压缩（compaction）会把旧历史换成**一条 checkpoint 摘要**（一条 user 消息）。
+   提示段本身还在系统提示里，但对话里最有分量的东西变成了那份摘要 + 保留的最近几段历史，
+   模型的模仿对象从「规则」偏向「最近看到的例子」。摘要越厚，规则越像背景噪音。
+2. 规则原本只是系统提示里的一段话，**没有任何东西在压缩之后把它重新推到台前**。
+
+所以 v1.1.0 加了两件事：
+
+- **压缩后补一条短提醒**：插件监听会话的 `compaction/end`（日志事件，成功才不带 `error`），
+  在**下一次** `agent/pre-step` 往这一步的已认领用户消息之后插入一条几十 token 的
+  `notice` 消息（来源标成 `plugin`，不会在历史里被当成用户说的话）。
+  这就是模型被压缩打断后恢复工作的那一步 —— 提醒正好落在它眼前。同一次压缩只提醒一次。
+  这是本插件**唯一**会往对话里写消息的动作；设 `reassertAfterCompaction: false` 即可完全关闭
+  （关掉后插件就退化成 v1.0.0 的纯静态提示段，不注册任何监听）。
+- **让规则自己活过压缩**：提示段文本里明确要求「若本会话被压缩成 checkpoint，
+  checkpoint 的 `## Critical Context` 必须原样保留本节规则」。这不是空话：宿主为了复用前缀缓存，
+  会把**整个系统提示连同对话前缀一起重放给写摘要的模型**，所以这句话就是写给摘要模型的。
+  短提醒文本里也带了同样的要求，于是规则可以在多次压缩之间一路传下去。
+
+可选再加一层：`reassertEverySteps: 20` 表示每 20 步补一条同样的短提醒。
+默认 `0`（关闭）—— 先只靠上面两条，如果还是漂移再打开它。
 
 ## 为什么是宿主平面 + 静态段
 
@@ -99,20 +129,26 @@ ln -s ~/.dsh/plugin-src/dsh-batch-tool-calls <profile>/node_modules/dsh-batch-to
 | --- | --- | --- | --- |
 | `enabled` | boolean | `true` | `false` = 完全不注册这一段 |
 | `language` | `auto`\|`zh`\|`en` | `auto` | `auto` 跟随部署语言（`DSH_UI_LANGUAGE` / `DSHA_UI_LANGUAGE` / `LC_ALL` / `LANG`） |
-| `order` | number | `100` | 提示段排序：人格前缀 `0` 之后、`plan:policy` `500` 之前 |
+| `order` | number | `9500` | 提示段排序：工具说明 `1000–2900` / `TOOLS_SDK` `5000` 之后，`STRUCTURED_OUTPUT` `9900`、`persona-suffix` `10200` 之前（v1.0.0 是 `100`，想放回最前面就写 `100`） |
 | `minCalls` / `maxCalls` | number | `3` / `6` | 写进提示的「每步几个」区间（`maxCalls < minCalls` 时自动夹紧） |
 | `mentionShell` | boolean | `true` | 是否包含「独立 shell 命令合并成一次 bash」这条 |
 | `extra` | string | `''` | 追加自己的约定（另起一段；不能含 `{{...}}`，那是提示变量语法） |
+| `reassertAfterCompaction` | boolean | `true` | 上下文压缩后，在下一次 `agent/pre-step` 补一条短提醒（唯一会往对话写消息的动作） |
+| `reassertEverySteps` | number | `0` | 另外每 N 步补一条同样的短提醒；`0` = 关闭 |
 
 ## 验证
 
 ```bash
 npm install                               # 唯一依赖：@deepseek-ai/schemastery（插件配置 schema）
-npm test                                  # verify(25 项) + integration(真实 systemPrompt 服务，6 项)
-node test/verify.mjs                      # 模块形状 / 配置解析 / 注册行为 / 文本生成
+npm test                                  # verify(55 项) + integration(真实 systemPrompt 服务，9 项)
+node test/verify.mjs                      # 模块形状 / 配置解析 / 注册行为 / 文本生成 / 压缩后提醒的接线
 node test/integration.mjs                 # 在真实 systemPrompt 上注册 → 组装 → 断言段落出现且顺序正确
 node scripts/step-report.mjs <会话日志>    # 装前装后对比：步数、每步调用数分布、单调用步数
 ```
+
+`verify.mjs` 里的压缩后提醒用**假的事件总线**跑真实逻辑：构造 `compaction/end` →
+调 `agent/pre-step` → 断言插了一条 `notice`、同一次压缩只插一次、压缩失败（带 `error`）不插、
+本步被取消时不插且留到下一步、`reassertEverySteps` 按步数触发。
 
 `integration.mjs` 在没有 DSH 运行时包的机器上会打印 `SKIP` 并以 0 退出（`npm test` 因此可移植）。
 `step-report.mjs` 需要带 zstd 的 Node（22.15+ / 23+），只用 `node:zlib`，无第三方依赖。
@@ -135,12 +171,17 @@ DSHA_STARTUP_PROFILE=<profile> DSH_HOME=$DSH_HOME node $DSH_HOME/startup-observe
   没有每步调用数限制。一步发几个是模型自己的决定 —— 这正是本插件要影响的。
 - **「有 `~/.dsh/AGENTS.md` 就够了」**：那是「工作区指令」，属于软提示、按会话注入；
   本插件走系统提示的固定段落，随插件生命周期管理、可被预设覆盖、对所有预设一致生效。
-  两者可以叠加，也可以只留一个。
+  两者可以叠加，也可以只留一个。注意：工作区指令虽然也会在压缩后重新注入一次，
+  但它跟系统提示里的段落一样，都只是「上下文里的又一坨字」—— 所以 v1.1.0 才额外加了
+  压缩后那一条贴着当前步骤的短提醒。
 
 ## 局限（诚实说明）
 
 - 这是**提示层**的约束：模型仍可能不照做。它提高概率，不做强制。
 - 不会替模型判断哪些调用真的独立 —— 规则写在提示里，判断仍由模型完成。
+- 压缩后提醒依赖宿主发出 `compaction/end`（`@deepseek-ai/dsh-compaction-basic` 默认装）；
+  组合里没有压缩后端时，这条通道自然从不触发，静态提示段照常工作。
+- 只提供 `systemPrompt`、没有事件总线的宿主上，插件只注册静态提示段（不会报错）。
 - 想把「一步顶很多步」做成硬机制，看上层的 PTC 模式（用一个 TypeScript 程序组合多步操作）。
 
 ## 卸载
@@ -149,7 +190,23 @@ DSHA_STARTUP_PROFILE=<profile> DSH_HOME=$DSH_HOME node $DSH_HOME/startup-observe
 dsh plugin --profile <profile> remove dsh-batch-tool-calls
 ```
 
-提示段随这一行卸载自动撤销（`systemPrompt.section()` 返回的 disposer 由 Cordis 生命周期接管）。
+提示段与两个事件监听都随这一行卸载自动撤销（`systemPrompt.section()` 与 `ctx.on()` 返回的
+disposer 由 Cordis 生命周期接管）。
+
+## 更新记录
+
+### 1.1.0
+
+- 修复「压缩几次上下文后就不守规矩」：压缩后在下一次 `agent/pre-step` 补一条短 `notice` 提醒
+  （`reassertAfterCompaction`，默认开）；提示段与提醒文本都要求 checkpoint 原样保留规则。
+- 提示段默认位置从 `order: 100` 移到 `order: 9500`（工具说明之后、靠近对话），提高每步可见度。
+- 文本加入「每步自检」和「与是否压缩无关」的明确措辞。
+- 新增 `reassertEverySteps`（默认 0）。
+- 测试：verify 25 → 55 项，integration 6 → 9 项。
+
+### 1.0.0
+
+- 首个版本：静态 systemPrompt 提示段。
 
 ## License
 
