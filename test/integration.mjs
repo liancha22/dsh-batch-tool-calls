@@ -114,7 +114,7 @@ if (booted.service !== undefined) {
   ok('真总线上：compaction/end 之后被插入一条 notice', decision.messages.length === 1, decision.messages.length)
   ok(
     '真总线上：插入的正是本插件的 notice',
-    decision.messages[0]?.source?.plugin === 'batch-tool-calls' && decision.messages[0]?.source?.form === 'notice',
+    decision.messages[0]?.source?.kind === 'plugin:batch-tool-calls' && decision.messages[0]?.source?.form === 'notice',
     decision.messages[0]?.source,
   )
 
