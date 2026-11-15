@@ -110,8 +110,8 @@ for (const event of compactedEnd()) ctx.handlers.get('session/event')(session, e
 decision = await runPreStep(ctx, { agent: { session }, step: 3 })
 ok('压缩后下一步插入一条消息', decision.messages.length === 1, decision.messages.length)
 const notice = decision.messages[0]
-ok('插入的是 user 角色的 notice', notice.role === 'user' && notice.source.kind === 'plugin' && notice.source.form === 'notice')
-ok('来源标了插件名（否则会渲染成用户提示）', notice.source.plugin === 'batch-tool-calls')
+ok('插入的是 user 角色的 notice', notice.role === 'user' && notice.source.kind === 'plugin:batch-tool-calls' && notice.source.form === 'notice')
+ok('来源用 v4 的 producer-owned kind，不再带已退役的 plugin 字段', notice.source.kind === 'plugin:batch-tool-calls' && notice.source.plugin === undefined)
 ok('摘要在上限内', typeof notice.source.summary === 'string' && notice.source.summary.length <= 120)
 ok('正文含「批次提醒」', notice.content[0].text.includes('批次提醒'))
 ok('正文要求 checkpoint 保留这条提醒', notice.content[0].text.includes('Critical Context'))
